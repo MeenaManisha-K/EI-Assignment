@@ -1,0 +1,255 @@
+Real-time Chat Application Programming Exercise
+/* Problem Statement
+Create a simple real-time chat application where users can join different chat rooms or create
+their own chat rooms. Users should be able to send and receive messages in real-time.
+Functional Requirements
+1. Allow users to create/join chat rooms by entering a unique room ID.
+2. Enable users to send and receive messages in real-time within a chat room.
+3. Display a list of active users in the chat room.
+4. Optional: Implement a private messaging feature between users.
+5. Optional: Implement message history, so the chat persists even if the user leaves and rejoins. */
+
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+// Observer pattern: Client observer interface
+interface ClientObserver {
+    void onMessageReceived(String roomId, String username, String message);
+    void onUserJoined(String roomId, String username);
+    void onUserLeft(String roomId, String username);
+}
+
+// Subject pattern: ChatRoom subject interface
+interface ChatRoomSubject {
+    void registerClient(ClientObserver client);
+    void removeClient(ClientObserver client);
+    void notifyMessage(String username, String message);
+    void notifyUserJoined(String username);
+    void notifyUserLeft(String username);
+}
+
+// Abstract Client Adapter (Adapter Pattern)
+abstract class ClientAdapter implements ClientObserver {
+    protected String username;
+
+    public ClientAdapter(String username) {
+        this.username = username;
+    }
+
+    public abstract void sendMessage(String roomId, String message);
+    public abstract void receiveMessage(String roomId, String username, String message);
+
+    @Override
+    public void onMessageReceived(String roomId, String username, String message) {
+        receiveMessage(roomId, username, message);
+    }
+
+    @Override
+    public void onUserJoined(String roomId, String username) {
+        System.out.println("[" + roomId + "] User joined: " + username);
+    }
+
+    @Override
+    public void onUserLeft(String roomId, String username) {
+        System.out.println("[" + roomId + "] User left: " + username);
+    }
+}
+
+// Concrete Client Adapter for Console (simulated)
+class ConsoleClientAdapter extends ClientAdapter {
+
+    public ConsoleClientAdapter(String username) {
+        super(username);
+    }
+
+    @Override
+    public void sendMessage(String roomId, String message) {
+        ChatRoomManager.getInstance().sendMessage(roomId, username, message);
+    }
+
+    @Override
+    public void receiveMessage(String roomId, String username, String message) {
+        // Avoid echo of own message
+        if (!this.username.equals(username)) {
+            System.out.println("[" + roomId + "] " + username + ": " + message);
+        }
+    }
+}
+
+// ChatRoom implements Subject
+class ChatRoom implements ChatRoomSubject {
+    private String roomId;
+    private List<ClientObserver> clients = new CopyOnWriteArrayList<>();
+    private List<String> users = new CopyOnWriteArrayList<>();
+    private List<String> messageHistory = new ArrayList<>();
+
+    public ChatRoom(String roomId) {
+        this.roomId = roomId;
+    }
+
+    public String getRoomId() {
+        return roomId;
+    }
+
+    public synchronized void addUser(ClientObserver client, String username) {
+        clients.add(client);
+        users.add(username);
+        notifyUserJoined(username);
+        sendHistory(client);
+    }
+
+    public synchronized void removeUser(ClientObserver client, String username) {
+        clients.remove(client);
+        users.remove(username);
+        notifyUserLeft(username);
+    }
+
+    @Override
+    public void registerClient(ClientObserver client) {
+        clients.add(client);
+    }
+
+    @Override
+    public void removeClient(ClientObserver client) {
+        clients.remove(client);
+    }
+
+    @Override
+    public void notifyMessage(String username, String message) {
+        String formattedMsg = username + ": " + message;
+        messageHistory.add(formattedMsg);
+        for (ClientObserver client : clients) {
+            client.onMessageReceived(roomId, username, message);
+        }
+    }
+
+    @Override
+    public void notifyUserJoined(String username) {
+        for (ClientObserver client : clients) {
+            client.onUserJoined(roomId, username);
+        }
+    }
+
+    @Override
+    public void notifyUserLeft(String username) {
+        for (ClientObserver client : clients) {
+            client.onUserLeft(roomId, username);
+        }
+    }
+
+    public List<String> getUsers() {
+        return Collections.unmodifiableList(users);
+    }
+
+    public List<String> getMessageHistory() {
+        return Collections.unmodifiableList(messageHistory);
+    }
+
+    private void sendHistory(ClientObserver client) {
+        System.out.println("Sending message history to " + ((ClientAdapter)client).username + " in room " + roomId);
+        for (String msg : messageHistory) {
+            // Send as if new message
+            client.onMessageReceived(roomId, "History", msg);
+        }
+    }
+}
+
+// Singleton ChatRoomManager (Creational pattern)
+class ChatRoomManager {
+    private static volatile ChatRoomManager instance;
+    private Map<String, ChatRoom> chatRooms = new HashMap<>();
+
+    private ChatRoomManager() {}
+
+    public static ChatRoomManager getInstance() {
+        if (instance == null) {
+            synchronized (ChatRoomManager.class) {
+                if (instance == null) {
+                    instance = new ChatRoomManager();
+                }
+            }
+        }
+        return instance;
+    }
+
+    public synchronized ChatRoom getOrCreateRoom(String roomId) {
+        return chatRooms.computeIfAbsent(roomId, id -> new ChatRoom(id));
+    }
+
+    public synchronized void joinRoom(String roomId, ClientAdapter client) {
+        ChatRoom room = getOrCreateRoom(roomId);
+        room.addUser(client, client.username);
+        room.registerClient(client);
+        System.out.println(client.username + " joined room " + roomId);
+    }
+
+    public synchronized void leaveRoom(String roomId, ClientAdapter client) {
+        ChatRoom room = chatRooms.get(roomId);
+        if (room != null) {
+            room.removeUser(client, client.username);
+            room.removeClient(client);
+            System.out.println(client.username + " left room " + roomId);
+        }
+    }
+
+    public synchronized void sendMessage(String roomId, String username, String message) {
+        ChatRoom room = chatRooms.get(roomId);
+        if (room != null) {
+            room.notifyMessage(username, message);
+        } else {
+            System.out.println("Room " + roomId + " does not exist.");
+        }
+    }
+
+    public synchronized List<String> getActiveUsers(String roomId) {
+        ChatRoom room = chatRooms.get(roomId);
+        if (room != null) {
+            return room.getUsers();
+        }
+        return Collections.emptyList();
+    }
+}
+
+// Main class to demo the chat system
+public class RealTimeChatSimulation {
+
+    public static void main(String[] args) throws InterruptedException {
+        ChatRoomManager manager = ChatRoomManager.getInstance();
+
+        // Create clients (simulate users)
+        ConsoleClientAdapter alice = new ConsoleClientAdapter("Alice");
+        ConsoleClientAdapter bob = new ConsoleClientAdapter("Bob");
+        ConsoleClientAdapter charlie = new ConsoleClientAdapter("Charlie");
+
+        String roomId = "Room123";
+
+        // Users join the room
+        manager.joinRoom(roomId, alice);
+        manager.joinRoom(roomId, bob);
+        manager.joinRoom(roomId, charlie);
+
+        // Alice sends a message
+        alice.sendMessage(roomId, "Hello everyone!");
+
+        // Bob replies
+        bob.sendMessage(roomId, "Hi Alice! How's it going?");
+
+        // Charlie sends a message
+        charlie.sendMessage(roomId, "Good to see you all here!");
+
+        // Display active users in the room
+        System.out.println("Active users in " + roomId + ": " + manager.getActiveUsers(roomId));
+
+        // Bob leaves
+        manager.leaveRoom(roomId, bob);
+
+        // Alice sends a goodbye message
+        alice.sendMessage(roomId, "Looks like Bob left, goodbye everyone!");
+
+        // Display active users again
+        System.out.println("Active users in " + roomId + ": " + manager.getActiveUsers(roomId));
+
+        // Wait a moment to see output (for demo purposes)
+        Thread.sleep(1000);
+    }
+}
