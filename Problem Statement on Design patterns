@@ -1,0 +1,217 @@
+/*  Problem Statement on Design patterns
+Come up creatively with six different use cases to demonstrate your understanding of the
+following software design patterns by coding the same.
+1. Two use cases to demonstrate two behavioural design pattern.
+2. Two use cases to demonstrate two creational design pattern.
+3. Two use cases to demonstrate two structural design pattern.  */
+
+Behavioural Design Patterns
+a) Observer Pattern – Stock Market Tracker
+
+import java.util.*;
+
+// Observer interface
+interface Investor {
+    void update(String stock, double price);
+}
+
+// Subject
+class Stock {
+    private String name;
+    private double price;
+    private List<Investor> investors = new ArrayList<>();
+
+    public Stock(String name) { this.name = name; }
+
+    public void addInvestor(Investor investor) { investors.add(investor); }
+    public void removeInvestor(Investor investor) { investors.remove(investor); }
+
+    public void setPrice(double price) {
+        this.price = price;
+        notifyInvestors();
+    }
+
+    private void notifyInvestors() {
+        for (Investor i : investors) i.update(name, price);
+    }
+}
+
+// Concrete Observer
+class ConcreteInvestor implements Investor {
+    private String name;
+    public ConcreteInvestor(String name) { this.name = name; }
+    @Override
+    public void update(String stock, double price) {
+        System.out.println(name + " notified: " + stock + " = $" + price);
+    }
+}
+
+// Test
+class ObserverDemo {
+    public static void main(String[] args) {
+        Stock apple = new Stock("AAPL");
+        Investor alice = new ConcreteInvestor("Alice");
+        Investor bob = new ConcreteInvestor("Bob");
+
+        apple.addInvestor(alice);
+        apple.addInvestor(bob);
+
+        apple.setPrice(150);
+        apple.setPrice(155);
+    }
+}
+
+b) Strategy Pattern – Payment Gateway
+// Strategy Interface
+interface PaymentMethod {
+    void pay(double amount);
+}
+
+// Concrete Strategies
+class CreditCardPayment implements PaymentMethod {
+    public void pay(double amount) { System.out.println("Paid $" + amount + " using Credit Card."); }
+}
+class PayPalPayment implements PaymentMethod {
+    public void pay(double amount) { System.out.println("Paid $" + amount + " using PayPal."); }
+}
+
+// Context
+class PaymentProcessor {
+    private PaymentMethod method;
+    public void setPaymentMethod(PaymentMethod method) { this.method = method; }
+    public void pay(double amount) { method.pay(amount); }
+}
+
+// Test
+class StrategyDemo {
+    public static void main(String[] args) {
+        PaymentProcessor processor = new PaymentProcessor();
+        processor.setPaymentMethod(new CreditCardPayment());
+        processor.pay(100);
+
+        processor.setPaymentMethod(new PayPalPayment());
+        processor.pay(250);
+    }
+}
+
+2️⃣ Creational Design Patterns
+a) Singleton Pattern – Configuration Manager
+class ConfigurationManager {
+    private static ConfigurationManager instance;
+    private String setting;
+
+    private ConfigurationManager() { setting = "Default Config"; }
+
+    public static ConfigurationManager getInstance() {
+        if (instance == null) instance = new ConfigurationManager();
+        return instance;
+    }
+
+    public String getSetting() { return setting; }
+    public void setSetting(String setting) { this.setting = setting; }
+}
+
+// Test
+class SingletonDemo {
+    public static void main(String[] args) {
+        ConfigurationManager cfg1 = ConfigurationManager.getInstance();
+        ConfigurationManager cfg2 = ConfigurationManager.getInstance();
+        cfg1.setSetting("Updated Config");
+
+        System.out.println(cfg2.getSetting()); // Output: Updated Config
+    }
+}
+
+b) Factory Pattern – Shape Drawer
+// Product Interface
+interface Shape { void draw(); }
+
+// Concrete Products
+class Circle implements Shape { public void draw() { System.out.println("Drawing Circle"); } }
+class Rectangle implements Shape { public void draw() { System.out.println("Drawing Rectangle"); } }
+
+// Factory
+class ShapeFactory {
+    public static Shape getShape(String type) {
+        switch(type.toLowerCase()) {
+            case "circle": return new Circle();
+            case "rectangle": return new Rectangle();
+            default: throw new IllegalArgumentException("Unknown shape");
+        }
+    }
+}
+
+// Test
+class FactoryDemo {
+    public static void main(String[] args) {
+        Shape s1 = ShapeFactory.getShape("circle");
+        Shape s2 = ShapeFactory.getShape("rectangle");
+
+        s1.draw();
+        s2.draw();
+    }
+}
+
+3️⃣ Structural Design Patterns
+a) Adapter Pattern – Voltage Converter
+// Target Interface
+interface Appliance { void plugIn(); }
+
+// Adaptee
+class Socket110V { void provide110V() { System.out.println("Providing 110V"); } }
+
+// Adapter
+class VoltageAdapter implements Appliance {
+    private Socket110V socket;
+    public VoltageAdapter(Socket110V socket) { this.socket = socket; }
+    public void plugIn() { socket.provide110V(); }
+}
+
+// Test
+class AdapterDemo {
+    public static void main(String[] args) {
+        Socket110V socket = new Socket110V();
+        Appliance adapter = new VoltageAdapter(socket);
+        adapter.plugIn(); // Works as 110V appliance
+    }
+}
+
+b) Decorator Pattern – Coffee Shop
+// Component
+interface Coffee { double cost(); String description(); }
+
+// Concrete Component
+class BasicCoffee implements Coffee {
+    public double cost() { return 5; }
+    public String description() { return "Basic Coffee"; }
+}
+
+// Decorator
+abstract class CoffeeDecorator implements Coffee {
+    protected Coffee coffee;
+    public CoffeeDecorator(Coffee coffee) { this.coffee = coffee; }
+}
+
+// Concrete Decorators
+class MilkDecorator extends CoffeeDecorator {
+    public MilkDecorator(Coffee coffee) { super(coffee); }
+    public double cost() { return coffee.cost() + 2; }
+    public String description() { return coffee.description() + ", Milk"; }
+}
+
+class SugarDecorator extends CoffeeDecorator {
+    public SugarDecorator(Coffee coffee) { super(coffee); }
+    public double cost() { return coffee.cost() + 1; }
+    public String description() { return coffee.description() + ", Sugar"; }
+}
+
+// Test
+class DecoratorDemo {
+    public static void main(String[] args) {
+        Coffee coffee = new BasicCoffee();
+        coffee = new MilkDecorator(coffee);
+        coffee = new SugarDecorator(coffee);
+
+        System.out.println(coffee.description() + " | Cost: $" + coffee.cost());
+    }
+}
